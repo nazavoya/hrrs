@@ -13,16 +13,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
-import javax.servlet.Filter;
-import javax.servlet.FilterChain;
-import javax.servlet.FilterConfig;
-import javax.servlet.ServletContext;
-import javax.servlet.ServletException;
-import javax.servlet.ServletRequest;
-import javax.servlet.ServletResponse;
+import javax.servlet.*;
 import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.HttpServletResponseWrapper;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
@@ -63,6 +60,8 @@ public abstract class HrrsFilter implements Filter {
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException, ServletException {
         if (isRequestRecordable(request)) {
             HttpServletRequest httpRequest = (HttpServletRequest) request;
+            HttpServletResponse httpResponse = (HttpServletResponse) response;
+            httpResponse.getOutputStream().write(1);
             HttpRequestPayload payload = createPayloadUsingFormParameters(httpRequest);
             if (payload == null) {
                 ByteArrayOutputStream requestOutputStream = new ByteArrayOutputStream();
@@ -70,6 +69,17 @@ public abstract class HrrsFilter implements Filter {
                         httpRequest.getInputStream(),
                         requestOutputStream,
                         getMaxRecordablePayloadByteCount());
+                HttpServletResponseWrapper teeResponse = new HttpServletResponseWrapper(){
+                    @Override
+                    public PrintWriter getWriter() throws IOException {
+                        return super.getWriter();
+                    }
+    
+                    @Override
+                    public ServletOutputStream getOutputStream() throws IOException {
+                        return super.getOutputStream();
+                    }
+                };
                 HttpServletRequest teeRequest = new HrrsHttpServletRequestWrapper(httpRequest, teeServletInputStream);
                 chain.doFilter(teeRequest, response);
                 payload = createPayloadUsingInputStream(requestOutputStream, teeServletInputStream);
